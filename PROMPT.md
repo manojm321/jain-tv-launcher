@@ -31,8 +31,13 @@ Back up first
 Debloat
 - List installed packages and sort them into: manufacturer telemetry/analytics, manufacturer content
   and ad services (PatchWall, recommendation rows, content providers), background services I probably
-  don't need (share/cast duplicates, cleaners, update services), preloaded apps, and streaming apps.
+  don't need (share/cast duplicates, cleaners), preloaded apps, and streaming apps.
 - Disable the first categories with `pm disable-user --user 0`, never uninstall system packages.
+- Never disable what the TV needs to work: the TV app and input services that play HDMI and the
+  tuner, the input/source menu, remote control and Bluetooth pairing services, the on-screen
+  keyboard, Google Play Store and Play Services. Manufacturer package names often don't say what a
+  package does: check its activities and services with `dumpsys package` first, and ask me if it's
+  still unclear.
 - Before touching streaming apps, voice assistant, Chromecast, Miracast or the update service, ask me
   which ones I use with a checklist question and disable only what I don't tick.
 - Run `pm` commands one per shell call, chained commands may silently stop after the first.

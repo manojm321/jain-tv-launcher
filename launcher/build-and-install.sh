@@ -10,6 +10,8 @@ export PATH="$JAVA_HOME/bin:$PATH"
 [ -f local.properties ] || echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew assembleDebug -q --console=plain
 PY=../tools/venv/bin/python
+[ -x "$PY" ] || PY=../tools/venv/Scripts/python.exe
+export MSYS_NO_PATHCONV=1
 APK=app/build/outputs/apk/debug/app-debug.apk
 "$PY" -I ../tools/b64push.py "$APK" /data/local/tmp/tvhome.apk
 printf '%s\n' \

@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
@@ -67,7 +68,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private SpringAnimation springX, springY;
     private float glassTargetX, glassTargetY;
     private boolean glassShown;
-    private int lastFocused = 0;
+    // Static so they survive the activity being destroyed while another app is open (low-memory TVs,
+    // or Developer options → "Don't keep activities"); they only reset when the process dies.
+    private static int lastFocused = 0;
+    /** App of the last focused tile, so focus follows it when the app list changes. */
+    private static String lastFocusedKey;
     private float density;
 
     private View skyBackdrop;
@@ -85,6 +90,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private int weatherCounter = 0;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    /** Refreshes the network pill when the connection changes: at boot Wi-Fi often connects after Home is shown. */
+    private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
+        @Override
+        public void onAvailable(@NonNull Network network) {
+            handler.post(MainActivity.this::updateWifiLabel);
+        }
+
+        @Override
+        public void onLost(@NonNull Network network) {
+            handler.post(MainActivity.this::updateWifiLabel);
+        }
+    };
     private final Runnable minuteTick = new Runnable() {
         @Override
         public void run() {
@@ -197,6 +214,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             boolean onTile = newF != null && newF.getId() == R.id.card;
             if (!onTile) hideGlass();
         });
+
+        ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+        if (cm != null) cm.registerDefaultNetworkCallback(networkCallback);
     }
 
     @Override
@@ -205,6 +225,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         glassShown = false;
         glass.setAlpha(0f);
         ambient.setAlpha(0f);
+        // Read these before reload(): rebinding can move focus to the first tile and overwrite them.
+        final String returnKey = lastFocusedKey;
+        final int returnSlot = lastFocused;
         adapter.reload();
         grid.scheduleLayoutAnimation();
         updateGreeting();
@@ -214,11 +237,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         updatePanchang();
         handler.postDelayed(minuteTick, MINUTE_MS);
 
-        // Return to the tile we left from, or the first one.
+        // Return to the app we left from, or the same slot if that app is gone. Always refocus: after
+        // reload() the view that holds focus may no longer show the app it had.
         grid.post(() -> {
-            View focused = getCurrentFocus();
-            if (focused != null && grid.findContainingViewHolder(focused) != null) return;
-            focusTile(lastFocused);
+            int pos = adapter.positionOf(returnKey);
+            focusTile(pos >= 0 ? pos : returnSlot);
         });
     }
 
@@ -226,6 +249,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onPause() {
         super.onPause();
         handler.removeCallbacks(minuteTick);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+        if (cm != null) cm.unregisterNetworkCallback(networkCallback);
     }
 
     @Override
@@ -238,6 +268,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     public void onTileFocused(int position, View card) {
         lastFocused = position;
+        lastFocusedKey = adapter.keyAt(position);
         // Tile rect in root coordinates, using layout positions (ignores the scale animation).
         Rect r = new Rect(0, 0, card.getWidth(), card.getHeight());
         root.offsetDescendantRectToMyCoords(card, r);
@@ -330,7 +361,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         final int pos = Math.max(0, Math.min(position, adapter.getItemCount() - 1));
         RecyclerView.ViewHolder vh = grid.findViewHolderForAdapterPosition(pos);
         if (vh != null) {
-            vh.itemView.findViewById(R.id.card).requestFocus();
+            View card = vh.itemView.findViewById(R.id.card);
+            // Already focused (e.g. back from an app): no focus change fires, so restore the glass by hand.
+            if (card.isFocused()) onTileFocused(pos, card);
+            else card.requestFocus();
             return;
         }
         // Not laid out yet: scroll there, then focus once the scroll settles.
@@ -529,7 +563,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         try {
             startActivity(i);
         } catch (ActivityNotFoundException e) {
-            Toast.makeText(this, "Not available on this TV", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.not_available, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -549,6 +583,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         boolean sawNonHdmi = false;
+        String tunerId = null;
         if (tim != null) {
             List<TvInputInfo> inputs = new ArrayList<>(tim.getTvInputList());
             // HDMI ports first in port order, then AV and the rest.
@@ -557,14 +592,28 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 if (ha != hb) return ha ? -1 : 1;
                 return String.valueOf(a.loadLabel(this)).compareToIgnoreCase(String.valueOf(b.loadLabel(this)));
             });
+            // Some TVs (Sony) report every HDMI port as connected whether or not anything is plugged in,
+            // so drop the HDMI status then. A TV with every port really in use loses it too.
+            int hdmiPorts = 0, hdmiConnected = 0;
             for (TvInputInfo info : inputs) {
+                if (!info.isPassthroughInput() || info.getType() != TvInputInfo.TYPE_HDMI) continue;
+                hdmiPorts++;
+                if (tim.getInputState(info.getId()) == TvInputManager.INPUT_STATE_CONNECTED) hdmiConnected++;
+            }
+            boolean hdmiStateBogus = hdmiPorts > 1 && hdmiConnected == hdmiPorts;
+            for (TvInputInfo info : inputs) {
+                if (info.getType() == TvInputInfo.TYPE_TUNER
+                        && (info.getServiceInfo().applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0
+                        && (tunerId == null || info.getId().compareTo(tunerId) < 0)) {
+                    tunerId = info.getId();
+                }
                 if (!info.isPassthroughInput()) continue;
                 CharSequence l = info.loadLabel(this);
                 String label = l == null ? info.getId() : l.toString();
                 boolean hdmi = info.getType() == TvInputInfo.TYPE_HDMI;
                 if (hdmi && !label.toUpperCase().contains("HDMI")) label = "HDMI " + label;
                 final String id = info.getId();
-                int state = tim.getInputState(id);
+                int state = hdmi && hdmiStateBogus ? -1 : tim.getInputState(id);
                 if (!hdmi && rows.getChildCount() > 0 && !sawNonHdmi) addSeparator(rows);
                 if (!hdmi) sawNonHdmi = true;
                 addInputRow(rows, popup, hdmi ? R.drawable.ic_input : R.drawable.ic_av, label, state,
@@ -573,14 +622,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
         }
         Intent liveTv = liveTvPkg.isEmpty() ? null : getPackageManager().getLeanbackLaunchIntentForPackage(liveTvPkg);
+        if (liveTv != null && tunerId != null) {
+            liveTv = new Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(TvContract.buildChannelUriForPassthroughInput(tunerId), "vnd.android.cursor.item/channel")
+                    .setPackage(liveTvPkg);
+        }
         if (liveTv != null) {
             if (rows.getChildCount() > 0) addSeparator(rows);
-            addInputRow(rows, popup, R.drawable.ic_livetv, getString(R.string.live_tv), -1, () -> open(liveTv));
+            final Intent liveTvIntent = liveTv;
+            addInputRow(rows, popup, R.drawable.ic_livetv, getString(R.string.live_tv), -1, () -> open(liveTvIntent));
         }
         if (rows.getChildCount() == 0) {
             Toast.makeText(this, R.string.no_inputs, Toast.LENGTH_SHORT).show();
             return;
         }
+
+        // Fit the widest row: TVs that report a status on every port (Sony) would otherwise squeeze the names out.
+        panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        popup.setWidth(Math.max(width, panel.getMeasuredWidth()));
 
         // Drop in: fade and unfold from the top edge.
         panel.setAlpha(0f);
