@@ -1,0 +1,49 @@
+# Category 1: Manufacturer Telemetry / Analytics / Tracking
+tv.samba.ssm
+com.sony.dtv.sktvfb
+com.google.android.feedback
+com.mediatek.tv.oneworld.logdump
+com.mediatek.tv.oneworld.logdumpservice
+com.mediatek.tv.diagnosis
+
+# Category 2: Manufacturer Content and Ad Services
+com.sony.dtv.promos
+com.sony.dtv.sonyselect
+com.sony.dtv.sonytab
+com.mediatek.tv.launcher.partner
+android.autoinstalls.config.sony.bluefin
+com.google.android.partnersetup
+
+# Category 3: Background services
+com.sony.dtv.multiscreendemo
+com.sony.dtv.demosupport
+com.sony.dtv.demosystemsupport
+com.sony.dtv.helpguidecontents
+com.sony.dtv.smarthelp
+com.sony.dtv.smartui
+com.sony.dtv.serviceinformation
+com.sony.dtv.sonyservicemode
+com.sony.dtv.eulaviewer
+com.sony.dtv.notificationcenter
+com.sony.dtv.ecodashboard
+com.sony.dtv.m2.seeds.iot
+com.sony.dtv.m2.seeds.iot.remotestart
+com.sony.dtv.m2.seeds.auth
+com.sony.dtv.m2.devicecontrolservice
+com.sony.dtv.ipcontrolaux
+com.mediatek.tv.applock
+com.mediatek.tv.oneworld.tvmtkond
+com.mediatek.browservice
+com.mediatek.tv.simpleremote
+com.sony.qrmt
+
+# Category 4: Preloaded apps
+com.google.android.youtube.tvmusic
+com.google.android.videos
+com.sonypicturescore
+com.google.android.katniss
+com.sony.dtv.voicesearch
+com.google.android.apps.mediashell
+com.sony.dtv.airplayapp
+com.sony.gaus.updatecenter
+com.mediatek.tv.systemupdater

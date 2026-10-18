@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cellChog"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_weight="1"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp"
+    android:paddingStart="3dp"
+    android:paddingEnd="3dp">
+
+    <TextView
+        android:id="@+id/tvChogName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Amrit"
+        android:textColor="#4ADE80"
+        android:textSize="11.5sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 700"
+        android:letterSpacing="0.02" />
+
+    <TextView
+        android:id="@+id/tvChogTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:text="09:07 - 10:35"
+        android:textColor="#99FFFFFF"
+        android:textSize="8.5sp"
+        android:fontFamily="@font/outfit" />
+
+    <TextView
+        android:id="@+id/tvChogBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_badge_good"
+        android:text="Best"
+        android:textColor="#86EFAC"
+        android:textSize="8sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 600"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
+        android:textAllCaps="true" />
+</LinearLayout>

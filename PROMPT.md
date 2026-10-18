@@ -13,7 +13,7 @@ shows it). Keep the TV on.
 ---
 
 I want to debloat my Android TV and replace its launcher with a clean Apple TV style home screen.
-My TV model is: <MODEL NAME HERE>. Work on the real device, step by step, and verify everything you
+My TV model is: BRAVIA BF1. Work on the real device, step by step, and verify everything you
 do with screenshots pulled from the TV. Ask me before anything that depends on my preferences.
 
 Connect

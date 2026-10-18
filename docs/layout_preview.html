@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android TV - Home Screen Layout Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #08090c;
+    color: #fff;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    min-height: 100vh;
+  }
+  
+  /* Controller Header */
+  .preview-controls {
+    width: 100%;
+    max-width: 1320px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .controls-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #f0f0f5;
+  }
+  .controls-options {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-tab {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: #d1d5db;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .btn-tab:hover { background: rgba(255,255,255,0.16); color: #fff; }
+  .btn-tab.active {
+    background: #ffffff;
+    color: #000;
+    font-weight: 600;
+    border-color: #fff;
+    box-shadow: 0 4px 14px rgba(255,255,255,0.2);
+  }
+
+  /* 16:9 1080p TV Frame Aspect Ratio Preview */
+  .tv-screen {
+    width: 100%;
+    max-width: 1320px;
+    aspect-ratio: 16 / 9;
+    background: #000000;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 25px 60px -15px rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 26px 48px 32px 48px;
+  }
+
+  /* Sky / Atmospheric backdrop */
+  .sky-backdrop {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #070b14 0%, #000000 65%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* Netflix Ambient Glow */
+  .ambient-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle 520px at 32% 56%, rgba(229,9,20,0.18) 0%, rgba(229,9,20,0.05) 50%, transparent 80%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .content-layer {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: space-between;
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .greeting {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .clock-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .clock-time {
+    font-size: 40px;
+    font-weight: 300;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+  .clock-ampm {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.08em;
+  }
+  .divider-v {
+    width: 1px;
+    height: 18px;
+    background: rgba(255,255,255,0.22);
+    margin: 0 6px;
+    align-self: center;
+  }
+  .clock-date {
+    font-size: 12.5px;
+    color: rgba(255,255,255,0.7);
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* Top Buttons */
+  .top-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  .top-pill {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* TODAY'S BIG BOXES */
+  .solar-boxes {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .solar-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 10px 16px;
+    backdrop-filter: blur(12px);
+  }
+  .solar-card.navakarsi-card {
+    background: rgba(56, 37, 16, 0.35);
+    border: 1.2px solid rgba(255, 229, 163, 0.45);
+    box-shadow: 0 4px 16px rgba(255, 200, 100, 0.08);
+  }
+  .card-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .solar-card.navakarsi-card .card-label {
+    color: #ffe5a3;
+  }
+  .card-value {
+    font-size: 24px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    margin: 3px 0 1px 0;
+  }
+  .solar-card.navakarsi-card .card-value {
+    color: #fff4d6;
+  }
+  .card-sub {
+    font-size: 10.5px;
+    color: rgba(255,255,255,0.5);
+  }
+  .solar-card.navakarsi-card .card-sub {
+    color: rgba(255, 229, 163, 0.75);
+  }
+
+  /* NEXT 7 DAYS TITHI SECTION */
+  .tithi-section {
+    margin-top: 12px;
+  }
+  .section-tag {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.45);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-tag::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* Continuous Frosted Ribbon */
+  .tithi-ribbon {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+  }
+  .tithi-col {
+    padding: 7px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid rgba(255,255,255,0.07);
+  }
+  .tithi-col:last-child { border-right: none; }
+  .tithi-col.today {
+    background: rgba(255,255,255,0.08);
+  }
+  .tithi-col.parva {
+    background: rgba(255, 204, 80, 0.08);
+  }
+  .day-label {
+    font-size: 9px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .tithi-val {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 1px 0;
+  }
+  .tithi-badge {
+    font-size: 8.5px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .badge-parva {
+    background: rgba(255, 215, 0, 0.22);
+    color: #ffd86b;
+    border: 1px solid rgba(255, 215, 0, 0.35);
+  }
+  .badge-regular {
+    color: rgba(255,255,255,0.32);
+  }
+
+  /* CHOGHADIYA SECTION */
+  .choghadiya-section {
+    margin-top: 12px;
+  }
+  .chog-strip {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+  }
+  .chog-cell {
+    padding: 7px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+    transition: all 0.2s;
+  }
+  .chog-cell:last-child { border-right: none; }
+  
+  /* Current Active Slot Glow */
+  .chog-cell.current {
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 12px rgba(255,255,255,0.15);
+  }
+  .chog-cell.current::before {
+    content: 'NOW';
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 7.5px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    padding: 1px 3px;
+    border-radius: 3px;
+    background: #ffffff;
+    color: #000;
+  }
+
+  .chog-name {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .chog-time {
+    font-size: 9.5px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.6);
+  }
+  .chog-status {
+    font-size: 8px;
+    font-weight: 600;
+    margin-top: 3px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  
+  /* Choghadiya Nature Colors */
+  .chog-good { color: #4ade80; }
+  .badge-good {
+    background: rgba(74, 222, 128, 0.18);
+    color: #86efac;
+    border: 1px solid rgba(74, 222, 128, 0.35);
+  }
+  .chog-neutral { color: #facc15; }
+  .badge-neutral {
+    background: rgba(250, 204, 21, 0.18);
+    color: #fef08a;
+    border: 1px solid rgba(250, 204, 21, 0.35);
+  }
+  .chog-bad { color: #f87171; }
+  .badge-bad {
+    background: rgba(248, 113, 113, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(248, 113, 113, 0.3);
+  }
+
+  /* DOCK SECTION */
+  .dock-area {
+    margin-top: auto;
+    padding-top: 10px;
+  }
+  .dock-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .dock-card {
+    height: 86px;
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+    background: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+  }
+  .dock-card.focused {
+    transform: scale(1.06);
+    outline: 3.5px solid rgba(255,255,255,0.9);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.85), 0 0 28px rgba(229,9,20,0.5);
+    z-index: 5;
+  }
+  .dock-label {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: #fff;
+  }
+
+  /* Help info below frame */
+  .notes {
+    margin-top: 14px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.65);
+    max-width: 960px;
+    line-height: 1.5;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Layout Controls -->
+  <div class="preview-controls">
+    <div class="controls-title">📺 Clean tvOS Home Preview: No Text Titles Over Dock + Tithi & Choghadiya</div>
+    <div class="controls-options">
+      <button class="btn-tab active" onclick="switchChog('day', this)">☀️ Day Choghadiya</button>
+      <button class="btn-tab" onclick="switchChog('night', this)">🌙 Night Choghadiya</button>
+    </div>
+  </div>
+
+  <!-- TV 1080p 16:9 Screen Simulation -->
+  <div class="tv-screen">
+    <div class="sky-backdrop"></div>
+    <div class="ambient-glow"></div>
+
+    <div class="content-layer">
+      <!-- 1. Top Bar -->
+      <div class="top-bar">
+        <div>
+          <div class="greeting">GOOD AFTERNOON</div>
+          <div class="clock-row">
+            <div class="clock-time">3:46</div>
+            <div class="clock-ampm">PM</div>
+            <div class="divider-v"></div>
+            <div class="clock-date">SUNDAY 18 OCTOBER</div>
+          </div>
+        </div>
+
+        <div class="top-buttons">
+          <div class="top-pill">📺 Inputs</div>
+          <div class="top-pill">📶 Wi-Fi</div>
+          <div class="top-pill">⚙️ Settings</div>
+        </div>
+      </div>
+
+      <!-- 2. Today's Big Boxes (Weather, Sunrise, Navakarsi, Sunset) -->
+      <div class="solar-boxes">
+        <div class="solar-card">
+          <div class="card-label">🌤 WEATHER</div>
+          <div class="card-value">26°C</div>
+          <div class="card-sub">Overcast</div>
+        </div>
+
+        <div class="solar-card">
+          <div class="card-label">☀️ SUNRISE</div>
+          <div class="card-value">6:10 AM</div>
+          <div class="card-sub">Dawn</div>
+        </div>
+
+        <div class="solar-card navakarsi-card">
+          <div class="card-label">✨ NAVAKARSI</div>
+          <div class="card-value">6:58 AM</div>
+          <div class="card-sub">Sunrise + 48 min</div>
+        </div>
+
+        <div class="solar-card">
+          <div class="card-label">🌇 SUNSET</div>
+          <div class="card-value">5:59 PM</div>
+          <div class="card-sub">Dusk</div>
+        </div>
+      </div>
+
+      <!-- 3. Next 7 Days Tithi (Just below today's boxes) -->
+      <div class="tithi-section">
+        <div class="section-tag">JAIN TITHI — NEXT 7 DAYS</div>
+        <div class="tithi-ribbon">
+          <div class="tithi-col today">
+            <div class="day-label">TODAY 18</div>
+            <div class="tithi-val" style="color: #ffe5a3;">Sud 7</div>
+            <div class="tithi-badge badge-parva" style="background:rgba(255,255,255,0.12); color:#fff; border:none;">Today</div>
+          </div>
+          <div class="tithi-col parva">
+            <div class="day-label">MON 19</div>
+            <div class="tithi-val" style="color:#ffd86b;">Sud 8</div>
+            <div class="tithi-badge badge-parva">Aathm 🪔</div>
+          </div>
+          <div class="tithi-col">
+            <div class="day-label">TUE 20</div>
+            <div class="tithi-val">Sud 9</div>
+            <div class="tithi-badge badge-regular">Normal</div>
+          </div>
+          <div class="tithi-col">
+            <div class="day-label">WED 21</div>
+            <div class="tithi-val">Sud 10</div>
+            <div class="tithi-badge badge-regular">Normal</div>
+          </div>
+          <div class="tithi-col parva">
+            <div class="day-label">THU 22</div>
+            <div class="tithi-val" style="color:#ffd86b;">Sud 11</div>
+            <div class="tithi-badge badge-parva">Agiyaras</div>
+          </div>
+          <div class="tithi-col">
+            <div class="day-label">FRI 23</div>
+            <div class="tithi-val">Sud 12</div>
+            <div class="tithi-badge badge-regular">Normal</div>
+          </div>
+          <div class="tithi-col">
+            <div class="day-label">SAT 24</div>
+            <div class="tithi-val">Sud 13</div>
+            <div class="tithi-badge badge-regular">Normal</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Choghadiya Section (Below 7-day Tithi) -->
+      <div class="choghadiya-section">
+        <div class="section-tag" id="chogTitle">TODAY'S CHOGHADIYA (DAY) — CURRENT: ROG (3:01 PM – 4:30 PM)</div>
+
+        <!-- Day Choghadiya Strip -->
+        <div id="chogDay" class="chog-strip">
+          <div class="chog-cell">
+            <div class="chog-name chog-bad">Udveg</div>
+            <div class="chog-time">06:10 - 07:38</div>
+            <div class="chog-status badge-bad">Avoid</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-neutral">Chal</div>
+            <div class="chog-time">07:38 - 09:07</div>
+            <div class="chog-status badge-neutral">Neutral</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-good">Labh</div>
+            <div class="chog-time">09:07 - 10:35</div>
+            <div class="chog-status badge-good">Good</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-good">Amrit</div>
+            <div class="chog-time">10:35 - 12:04</div>
+            <div class="chog-status badge-good">Best</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-bad">Kal</div>
+            <div class="chog-time">12:04 - 13:33</div>
+            <div class="chog-status badge-bad">Avoid</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-good">Shubh</div>
+            <div class="chog-time">13:33 - 15:01</div>
+            <div class="chog-status badge-good">Good</div>
+          </div>
+          <div class="chog-cell current">
+            <div class="chog-name chog-bad">Rog</div>
+            <div class="chog-time">15:01 - 16:30</div>
+            <div class="chog-status badge-bad">Avoid</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-bad">Udveg</div>
+            <div class="chog-time">16:30 - 17:59</div>
+            <div class="chog-status badge-bad">Avoid</div>
+          </div>
+        </div>
+
+        <!-- Night Choghadiya Strip (Hidden by default) -->
+        <div id="chogNight" class="chog-strip" style="display: none;">
+          <div class="chog-cell">
+            <div class="chog-name chog-good">Shubh</div>
+            <div class="chog-time">17:59 - 19:30</div>
+            <div class="chog-status badge-good">Good</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-good">Amrit</div>
+            <div class="chog-time">19:30 - 21:01</div>
+            <div class="chog-status badge-good">Best</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-neutral">Chal</div>
+            <div class="chog-time">21:01 - 22:33</div>
+            <div class="chog-status badge-neutral">Neutral</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-bad">Rog</div>
+            <div class="chog-time">22:33 - 00:04</div>
+            <div class="chog-status badge-bad">Avoid</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-bad">Kal</div>
+            <div class="chog-time">00:04 - 01:36</div>
+            <div class="chog-status badge-bad">Avoid</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-good">Labh</div>
+            <div class="chog-time">01:36 - 03:07</div>
+            <div class="chog-status badge-good">Good</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-bad">Udveg</div>
+            <div class="chog-time">03:07 - 04:38</div>
+            <div class="chog-status badge-bad">Avoid</div>
+          </div>
+          <div class="chog-cell">
+            <div class="chog-name chog-good">Shubh</div>
+            <div class="chog-time">04:38 - 06:10</div>
+            <div class="chog-status badge-good">Good</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Dock Row & App Grid (at bottom) -->
+      <div class="dock-area">
+        <div class="dock-grid">
+          <div class="dock-card focused" style="background: #141414;">
+            <div class="dock-label" style="color:#E50914; font-size: 20px; font-weight:800; letter-spacing:0.1em;">NETFLIX</div>
+          </div>
+          <div class="dock-card" style="background: #00050d; border: 1px solid rgba(255,255,255,0.08);">
+            <div class="dock-label" style="color:#00A8E1; font-weight:700;">prime video</div>
+          </div>
+          <div class="dock-card" style="background: #0d0000; border: 1px solid rgba(255,255,255,0.08);">
+            <div class="dock-label" style="color:#FF0000; font-weight:700;">▶ YouTube</div>
+          </div>
+          <div class="dock-card" style="background: #121418; border: 1px solid rgba(255,255,255,0.08);">
+            <div class="dock-label" style="color:#aaa;">⚙️ Settings</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    ✨ <strong>Pure, Minimalist tvOS Experience</strong>: The focused app is highlighted purely with the spring glass border and vibrant ambient color glow.
+  </div>
+
+  <script>
+    function switchChog(type, btn) {
+      document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (type === 'day') {
+        document.getElementById('chogDay').style.display = 'grid';
+        document.getElementById('chogNight').style.display = 'none';
+        document.getElementById('chogTitle').innerText = "TODAY'S CHOGHADIYA (DAY) — CURRENT: ROG (3:01 PM – 4:30 PM)";
+      } else {
+        document.getElementById('chogDay').style.display = 'none';
+        document.getElementById('chogNight').style.display = 'grid';
+        document.getElementById('chogTitle').innerText = "TONIGHT'S CHOGHADIYA (NIGHT) — STARTS AT SUNSET (5:59 PM)";
+      }
+    }
+  </script>
+</body>
+</html>

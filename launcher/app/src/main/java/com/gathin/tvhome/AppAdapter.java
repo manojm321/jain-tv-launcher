@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
@@ -14,6 +15,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -40,6 +42,8 @@ import java.util.Set;
  */
 public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
 
+    private static final String TAG = "TvHome";
+
     interface TileListener {
         void onTileFocused(int position, View card);
 
@@ -58,7 +62,7 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
         Entry(String label, ComponentName component, Drawable banner, Drawable icon) {
             this.label = label;
             this.component = component;
-            this.pkg = component.getPackageName();
+            this.pkg = component != null ? component.getPackageName() : "";
             this.banner = banner;
             this.icon = icon;
         }
@@ -85,19 +89,57 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
 
     void reload() {
         PackageManager pm = ctx.getPackageManager();
-        Intent probe = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
-        List<ResolveInfo> found = pm.queryIntentActivities(probe, 0);
+        Set<String> seen = new HashSet<>();
         List<Entry> fresh = new ArrayList<>();
+
+        // 1. Query Leanback launcher activities
+        Intent probeLeanback = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+        List<ResolveInfo> found = pm.queryIntentActivities(probeLeanback, 0);
         for (ResolveInfo ri : found) {
             if (ri.activityInfo == null) continue;
             String pkg = ri.activityInfo.packageName;
-            if (pkg.equals(ctx.getPackageName()) || hidden.contains(pkg)) continue;
+            if (pkg.equals(ctx.getPackageName()) || hidden.contains(pkg) || seen.contains(pkg)) continue;
+            seen.add(pkg);
             Drawable banner = ri.activityInfo.loadBanner(pm);
             if (banner == null) banner = ri.activityInfo.applicationInfo.loadBanner(pm);
             Drawable icon = ri.loadIcon(pm);
             String label = String.valueOf(ri.loadLabel(pm));
             fresh.add(new Entry(label, new ComponentName(pkg, ri.activityInfo.name), banner, icon));
         }
+
+        // 2. Query standard launcher activities
+        Intent probeStandard = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        List<ResolveInfo> foundStandard = pm.queryIntentActivities(probeStandard, 0);
+        for (ResolveInfo ri : foundStandard) {
+            if (ri.activityInfo == null) continue;
+            String pkg = ri.activityInfo.packageName;
+            if (pkg.equals(ctx.getPackageName()) || hidden.contains(pkg) || seen.contains(pkg)) continue;
+            seen.add(pkg);
+            Drawable banner = ri.activityInfo.loadBanner(pm);
+            if (banner == null) banner = ri.activityInfo.applicationInfo.loadBanner(pm);
+            Drawable icon = ri.loadIcon(pm);
+            String label = String.valueOf(ri.loadLabel(pm));
+            fresh.add(new Entry(label, new ComponentName(pkg, ri.activityInfo.name), banner, icon));
+        }
+
+        // 3. Fallback for dock apps: explicitly check if installed
+        for (String fav : favourites) {
+            if (seen.contains(fav) || hidden.contains(fav)) continue;
+            try {
+                ApplicationInfo ai = pm.getApplicationInfo(fav, 0);
+                if (!ai.enabled) continue;
+                Intent launchIntent = pm.getLeanbackLaunchIntentForPackage(fav);
+                if (launchIntent == null) launchIntent = pm.getLaunchIntentForPackage(fav);
+                ComponentName comp = launchIntent != null ? launchIntent.getComponent() : new ComponentName(fav, "");
+                Drawable banner = ai.loadBanner(pm);
+                Drawable icon = ai.loadIcon(pm);
+                String label = String.valueOf(ai.loadLabel(pm));
+                fresh.add(new Entry(label, comp, banner, icon));
+                seen.add(fav);
+            } catch (Exception ignored) {
+            }
+        }
+
         Collections.sort(fresh, (a, b) -> {
             int fa = favourites.indexOf(a.pkg), fb = favourites.indexOf(b.pkg);
             if (fa >= 0 || fb >= 0) {
@@ -107,8 +149,15 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
             }
             return a.label.compareToIgnoreCase(b.label);
         });
+
         items.clear();
         items.addAll(fresh);
+
+        for (int i = 0; i < items.size(); i++) {
+            Entry e = items.get(i);
+            Log.i(TAG, "Item " + i + ": pkg=" + e.pkg + ", label=" + e.label + ", hasBanner=" + (e.banner != null));
+        }
+
         notifyDataSetChanged();
     }
 
@@ -123,11 +172,13 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
     public void onBindViewHolder(@NonNull Holder h, int position) {
         Entry e = items.get(position);
         h.name.setText(e.label);
-        h.name.setVisibility(position < dockSize ? View.INVISIBLE : View.VISIBLE);   // the dock has no labels
+        h.name.setVisibility(position < dockSize ? View.INVISIBLE : View.VISIBLE);   // the dock has no labels below tile
         h.name.setAlpha(0f);
         h.card.setScaleX(1f);
         h.card.setScaleY(1f);
-        if (e.banner != null) {
+
+        boolean validBanner = e.banner != null && e.banner.getIntrinsicWidth() > 0 && e.banner.getIntrinsicHeight() > 0;
+        if (validBanner) {
             h.banner.setImageDrawable(e.banner);
             h.banner.setVisibility(View.VISIBLE);
             h.icon.setVisibility(View.GONE);
@@ -140,6 +191,7 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
             h.label.setText(e.label);
             h.label.setVisibility(View.VISIBLE);
         }
+
         h.card.setOnClickListener(v -> launch(e));
         h.card.setOnLongClickListener(v -> {
             Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + e.pkg));
@@ -153,15 +205,26 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
     }
 
     private void launch(Entry e) {
-        Intent i = new Intent(Intent.ACTION_MAIN)
-                .addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-                .setComponent(e.component)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-        try {
-            ctx.startActivity(i);
-        } catch (Exception ex) {
-            Toast.makeText(ctx, "Can't open " + e.label, Toast.LENGTH_SHORT).show();
+        Log.i(TAG, "Launching: " + e.pkg + " (" + e.label + ")");
+        Intent i = ctx.getPackageManager().getLeanbackLaunchIntentForPackage(e.pkg);
+        if (i == null) {
+            i = ctx.getPackageManager().getLaunchIntentForPackage(e.pkg);
         }
+        if (i == null && e.component != null && !e.component.getClassName().isEmpty()) {
+            i = new Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
+                    .setComponent(e.component);
+        }
+        if (i != null) {
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            try {
+                ctx.startActivity(i);
+                return;
+            } catch (Exception ex) {
+                Log.e(TAG, "Failed to launch " + e.pkg, ex);
+            }
+        }
+        Toast.makeText(ctx, "Can't open " + e.label, Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -198,29 +261,26 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
         long r = 0, g = 0, b = 0;
         for (int y = 0; y < n; y++) {
             for (int x = 0; x < n; x++) {
-                int p = bmp.getPixel(x, y);
-                r += Color.red(p);
-                g += Color.green(p);
-                b += Color.blue(p);
-                Color.colorToHSV(p, hsv);
-                float score = hsv[1] * Math.min(1f, hsv[2] * 1.4f);   // saturated and not too dark
+                int pixel = bmp.getPixel(x, y);
+                int alpha = (pixel >>> 24);
+                if (alpha < 128) continue;
+                Color.colorToHSV(pixel, hsv);
+                float sat = hsv[1], val = hsv[2];
+                if (val < 0.2f || val > 0.95f) continue;
+                float score = sat * 2.0f + val;
                 if (score > bestScore) {
                     bestScore = score;
-                    best = p;
+                    best = pixel;
                 }
+                r += (pixel >> 16) & 0xFF;
+                g += (pixel >> 8) & 0xFF;
+                b += pixel & 0xFF;
             }
         }
         bmp.recycle();
-        if (bestScore < 0.25f) {   // nearly monochrome banner (e.g. white): use its average, lifted
-            int avg = Color.rgb((int) (r / (n * n)), (int) (g / (n * n)), (int) (b / (n * n)));
-            Color.colorToHSV(avg, hsv);
-            hsv[2] = Math.max(hsv[2], 0.55f);
-            return Color.HSVToColor(hsv);
-        }
-        Color.colorToHSV(best, hsv);
-        hsv[1] = Math.min(1f, hsv[1] * 1.1f);
-        hsv[2] = Math.max(0.5f, hsv[2]);
-        return Color.HSVToColor(hsv);
+        if (bestScore >= 0.6f) return best | 0xFF000000;
+        int count = n * n;
+        return 0xFF000000 | (((int) (r / count)) << 16) | (((int) (g / count)) << 8) | ((int) (b / count));
     }
 
     static final class Holder extends RecyclerView.ViewHolder {
@@ -230,44 +290,51 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
         final TextView label;
         final TextView name;
 
-        Holder(View v, TileListener listener) {
-            super(v);
-            card = v.findViewById(R.id.card);
-            banner = v.findViewById(R.id.banner);
-            icon = v.findViewById(R.id.icon);
-            label = v.findViewById(R.id.label);
-            name = v.findViewById(R.id.name);
+        Holder(@NonNull View itemView, TileListener listener) {
+            super(itemView);
+            card = itemView.findViewById(R.id.card);
+            banner = itemView.findViewById(R.id.banner);
+            icon = itemView.findViewById(R.id.icon);
+            label = itemView.findViewById(R.id.label);
+            name = itemView.findViewById(R.id.name);
 
-            final float density = v.getResources().getDisplayMetrics().density;
-            final float radius = density * 16f;
+            card.setClipToOutline(true);
             card.setOutlineProvider(new ViewOutlineProvider() {
                 @Override
                 public void getOutline(View view, Outline outline) {
-                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+                    float r = 16f * view.getResources().getDisplayMetrics().density;
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), r);
                 }
             });
-            card.setClipToOutline(true);
 
-            card.setOnKeyListener((view, keyCode, event) -> {
-                if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
-                if (keyCode != KeyEvent.KEYCODE_DPAD_UP && keyCode != KeyEvent.KEYCODE_DPAD_DOWN) return false;
+            card.setOnFocusChangeListener((v, hasFocus) -> {
                 int pos = getBindingAdapterPosition();
-                return listener != null && pos != RecyclerView.NO_POSITION && listener.onTileVerticalKey(pos, keyCode);
+                if (pos == RecyclerView.NO_POSITION) return;
+                if (hasFocus) {
+                    card.animate().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).translationZ(8f).setDuration(160)
+                            .setInterpolator(new OvershootInterpolator(1.4f)).start();
+                    name.animate().alpha(1f).setDuration(120).start();
+                    listener.onTileFocused(pos, card);
+                } else {
+                    card.animate().scaleX(1f).scaleY(1f).translationZ(0f).setDuration(130).start();
+                    name.animate().alpha(0f).setDuration(100).start();
+                }
             });
 
-            card.setOnFocusChangeListener((view, focused) -> {
-                float s = focused ? FOCUS_SCALE : 1.0f;
-                view.animate().scaleX(s).scaleY(s)
-                        .setDuration(focused ? 260 : 180)
-                        .setInterpolator(new OvershootInterpolator(focused ? 1.6f : 0f))
-                        .start();
-                name.animate().alpha(focused ? 1f : 0f)
-                        .translationY(focused ? density * 4f : -density * 6f)
-                        .setDuration(220).start();
-                int pos = getBindingAdapterPosition();
-                if (focused && listener != null && pos != RecyclerView.NO_POSITION) {
-                    listener.onTileFocused(pos, view);
+            card.setOnKeyListener((v, keyCode, event) -> {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                        card.performClick();
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                        int pos = getBindingAdapterPosition();
+                        if (pos != RecyclerView.NO_POSITION) {
+                            return listener.onTileVerticalKey(pos, keyCode);
+                        }
+                    }
                 }
+                return false;
             });
         }
     }

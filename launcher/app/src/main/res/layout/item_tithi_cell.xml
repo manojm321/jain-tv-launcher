@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cellTithi"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_weight="1"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp">
+
+    <TextView
+        android:id="@+id/tvTithiDay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="TODAY 18"
+        android:textColor="#8CFFFFFF"
+        android:textSize="9sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 500"
+        android:letterSpacing="0.06"
+        android:textAllCaps="true" />
+
+    <TextView
+        android:id="@+id/tvTithiVal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:text="Sud 7"
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 600" />
+
+    <TextView
+        android:id="@+id/tvTithiBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Today"
+        android:textColor="#59FFFFFF"
+        android:textSize="8sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 600"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
+        android:textAllCaps="true" />
+</LinearLayout>

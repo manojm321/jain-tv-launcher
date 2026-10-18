@@ -60,10 +60,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private FrameLayout root;
     private GlassView glass;
     private View ambient;
-    private TextView heroName;
     private GradientDrawable ambientGlow;
     private int ambientColor;
-    private boolean heroShown;
     private TextView greeting;
     private TextView btnWifi;
     private SpringAnimation springX, springY;
@@ -72,12 +70,33 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private int lastFocused = 0;
     private float density;
 
+    private View skyBackdrop;
+    private GradientDrawable skyGradient;
+    private TextView tvBoxWeatherTemp;
+    private TextView tvBoxWeatherCond;
+    private TextView tvBoxSunriseTime;
+    private TextView tvBoxNavakarsiTime;
+    private TextView tvBoxSunsetTime;
+
+    private LinearLayout tithiRibbon;
+    private TextView tvChogTitle;
+    private LinearLayout chogStrip;
+    private WeatherManager.WeatherData lastWeatherData;
+
+    private int weatherCounter = 0;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable minuteTick = new Runnable() {
         @Override
         public void run() {
             updateGreeting();
             updateWifiLabel();
+            updateSkyBackdrop();
+            updatePanchang();
+            weatherCounter++;
+            if (weatherCounter >= 30) {
+                weatherCounter = 0;
+                updateWeather();
+            }
             handler.postDelayed(this, MINUTE_MS);
         }
     };
@@ -93,15 +112,29 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         root = findViewById(R.id.root);
         glass = findViewById(R.id.glass);
         ambient = findViewById(R.id.ambient);
-        heroName = findViewById(R.id.heroName);
         ambientGlow = new GradientDrawable();
         ambientGlow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-        ambientGlow.setGradientCenter(0.32f, 0.42f);
+        ambientGlow.setGradientCenter(0.32f, 0.56f);
         ambient.setBackground(ambientGlow);
         ambient.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) ->
                 ambientGlow.setGradientRadius((r - l) * 0.62f));
         greeting = findViewById(R.id.greeting);
         btnWifi = findViewById(R.id.btnWifi);
+
+        skyBackdrop = findViewById(R.id.skyBackdrop);
+        skyGradient = new GradientDrawable();
+        skyGradient.setOrientation(GradientDrawable.Orientation.TOP_BOTTOM);
+        skyBackdrop.setBackground(skyGradient);
+
+        tvBoxWeatherTemp = findViewById(R.id.tvBoxWeatherTemp);
+        tvBoxWeatherCond = findViewById(R.id.tvBoxWeatherCond);
+        tvBoxSunriseTime = findViewById(R.id.tvBoxSunriseTime);
+        tvBoxNavakarsiTime = findViewById(R.id.tvBoxNavakarsiTime);
+        tvBoxSunsetTime = findViewById(R.id.tvBoxSunsetTime);
+
+        tithiRibbon = findViewById(R.id.tithiRibbon);
+        tvChogTitle = findViewById(R.id.tvChogTitle);
+        chogStrip = findViewById(R.id.chogStrip);
 
         grid = findViewById(R.id.grid);
         grid.setLayoutManager(new GridLayoutManager(this, COLUMNS));
@@ -117,7 +150,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
             int h = b - t;
             int dockRow = (int) ((145 + 6 + 12) * density);   // item height plus DockDecoration offsets
-            int want = Math.max(0, h - dockRow - (int) (30 * density));
+            int want = Math.max(0, h - dockRow - (int) (6 * density));
             if (grid.getPaddingTop() != want) {
                 grid.setPadding(grid.getPaddingLeft(), want, grid.getPaddingRight(), grid.getPaddingBottom());
             }
@@ -171,13 +204,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         super.onResume();
         glassShown = false;
         glass.setAlpha(0f);
-        heroShown = false;
-        heroName.setAlpha(0f);
         ambient.setAlpha(0f);
         adapter.reload();
         grid.scheduleLayoutAnimation();
         updateGreeting();
         updateWifiLabel();
+        updateSkyBackdrop();
+        updateWeather();
+        updatePanchang();
         handler.postDelayed(minuteTick, MINUTE_MS);
 
         // Return to the tile we left from, or the first one.
@@ -235,7 +269,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         View item = (View) card.getParent();
         if (position < COLUMNS) {
-            // Dock: park it at the bottom of the screen and show the top shelf for this app.
+            // Dock: park it at the bottom of the screen and show ambient glow for this app.
             int decoratedTop = item.getTop() - (int) (6 * density);
             int dy = decoratedTop - grid.getPaddingTop();
             if (Math.abs(dy) > 1) grid.smoothScrollBy(0, dy);
@@ -251,47 +285,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     // ---- top shelf -------------------------------------------------------------------------------
 
     private void showHero(int position, float dockTopInRoot) {
-        String label = adapter.labelAt(position);
         int color = adapter.ambientColorAt(position);
-        float y = dockTopInRoot - 14 * density - 26 * density - heroName.getHeight();
-        boolean changed = !label.contentEquals(heroName.getText());
-
-        if (!heroShown) {
-            heroName.setText(label);
-            heroName.setY(y);
-            heroName.setTranslationX(0f);
-            heroName.animate().alpha(1f).setDuration(260).start();
-            setAmbient(color);
-            ambient.animate().alpha(1f).setDuration(600).start();
-            heroShown = true;
-        } else if (changed) {
-            heroName.animate().alpha(0f).translationX(-12 * density).setDuration(120).withEndAction(() -> {
-                heroName.setText(label);
-                heroName.setY(y);
-                heroName.setTranslationX(12 * density);
-                heroName.animate().alpha(1f).translationX(0f).setDuration(200).start();
-            }).start();
-            if (color != ambientColor) {
-                ambient.animate().alpha(0.35f).setDuration(200).withEndAction(() -> {
-                    setAmbient(color);
-                    ambient.animate().alpha(1f).setDuration(500).start();
-                }).start();
-            }
-        } else {
-            heroName.setY(y);
-        }
+        setAmbient(color);
     }
 
     private void setAmbient(int color) {
         ambientColor = color;
         int c = color & 0x00FFFFFF;
         ambientGlow.setColors(new int[]{0x5C000000 | c, 0x26000000 | c, 0x00000000 | c});
+        ambient.animate().alpha(1f).setDuration(500).start();
     }
 
     private void hideHero() {
-        if (!heroShown) return;
-        heroShown = false;
-        heroName.animate().alpha(0f).setDuration(160).start();
         ambient.animate().alpha(0f).setDuration(300).start();
     }
 
@@ -305,6 +310,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     public boolean onTileVerticalKey(int position, int keyCode) {
+        if (keyCode != KeyEvent.KEYCODE_DPAD_UP && keyCode != KeyEvent.KEYCODE_DPAD_DOWN) return false;
         int count = adapter.getItemCount();
         int target;
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
@@ -341,7 +347,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         grid.smoothScrollToPosition(pos);
     }
 
-    // ---- top bar ---------------------------------------------------------------------------------
+    // ---- top bar & panchang ----------------------------------------------------------------------
 
     private void updateGreeting() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
@@ -352,6 +358,145 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         else if (hour < 22) res = R.string.good_evening;
         else res = R.string.good_night;
         greeting.setText(res);
+    }
+
+    private void updateSkyBackdrop() {
+        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        int topColor;
+        int bottomColor;
+
+        if (hour >= 5 && hour < 8) {
+            // Dawn / Sunrise: soft deep navy to subtle golden horizon glow
+            topColor = 0xFF050811;
+            bottomColor = 0xFF281C10;
+        } else if (hour >= 8 && hour < 17) {
+            // Daytime: clean deep midnight with crisp hint of slate
+            topColor = 0xFF070B14;
+            bottomColor = 0xFF000000;
+        } else if (hour >= 17 && hour < 19) {
+            // Sunset / Dusk / Twilight: deep navy to warm dusky sunset crimson
+            topColor = 0xFF090B18;
+            bottomColor = 0xFF2E141D;
+        } else {
+            // Night: deep pure OLED black with subtle obsidian
+            topColor = 0xFF020408;
+            bottomColor = 0xFF000000;
+        }
+
+        skyGradient.setColors(new int[]{topColor, bottomColor});
+    }
+
+    private void updateWeather() {
+        WeatherManager.load(this, data -> {
+            if (data == null) return;
+            lastWeatherData = data;
+            if (!data.temperature.isEmpty()) {
+                tvBoxWeatherTemp.setText(data.temperature);
+                tvBoxWeatherCond.setText(data.condition.isEmpty() ? "Clear" : data.condition);
+            }
+            if (!data.sunrise.isEmpty()) {
+                tvBoxSunriseTime.setText(data.sunrise);
+            }
+            if (!data.navakarsi.isEmpty()) {
+                tvBoxNavakarsiTime.setText(data.navakarsi);
+            }
+            if (!data.sunset.isEmpty()) {
+                tvBoxSunsetTime.setText(data.sunset);
+            }
+            updatePanchang();
+        });
+    }
+
+    private void updatePanchang() {
+        renderTithis();
+        renderChoghadiya();
+    }
+
+    private void renderTithis() {
+        tithiRibbon.removeAllViews();
+        List<PanchangManager.TithiDay> list = PanchangManager.get7DayTithis();
+        for (int i = 0; i < list.size(); i++) {
+            PanchangManager.TithiDay td = list.get(i);
+            View v = getLayoutInflater().inflate(R.layout.item_tithi_cell, tithiRibbon, false);
+            TextView tvDay = v.findViewById(R.id.tvTithiDay);
+            TextView tvVal = v.findViewById(R.id.tvTithiVal);
+            TextView tvBadge = v.findViewById(R.id.tvTithiBadge);
+
+            tvDay.setText(td.dayLabel);
+            tvVal.setText(td.tithiText);
+            tvBadge.setText(td.badge);
+
+            if (td.isParva) {
+                v.setBackgroundResource(R.drawable.bg_tithi_cell_parva);
+                tvVal.setTextColor(0xFFFFD86B);
+                tvBadge.setBackgroundResource(R.drawable.bg_badge_parva);
+                tvBadge.setTextColor(0xFFFFD86B);
+            } else if (td.isToday) {
+                tvVal.setTextColor(0xFFFFE5A3);
+                tvBadge.setTextColor(0xFFFFFFFF);
+            }
+
+            tithiRibbon.addView(v);
+
+            if (i < list.size() - 1) {
+                View div = new View(this);
+                div.setBackgroundColor(0x1AFFFFFF);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams((int) density, ViewGroup.LayoutParams.MATCH_PARENT);
+                lp.setMargins(0, (int) (4 * density), 0, (int) (4 * density));
+                tithiRibbon.addView(div, lp);
+            }
+        }
+    }
+
+    private void renderChoghadiya() {
+        if (lastWeatherData == null || lastWeatherData.sunriseMillis <= 0) {
+            lastWeatherData = WeatherManager.computeAstronomicalSolar(12.9753, 77.591, "Bengaluru");
+        }
+        chogStrip.removeAllViews();
+        PanchangManager.ChoghadiyaInfo info = PanchangManager.getTodayChoghadiya(
+                lastWeatherData.sunriseMillis, lastWeatherData.sunsetMillis);
+
+        tvChogTitle.setText(info.title);
+
+        for (int i = 0; i < info.slots.size(); i++) {
+            PanchangManager.ChoghadiyaSlot slot = info.slots.get(i);
+            View v = getLayoutInflater().inflate(R.layout.item_chog_cell, chogStrip, false);
+            TextView tvName = v.findViewById(R.id.tvChogName);
+            TextView tvTime = v.findViewById(R.id.tvChogTime);
+            TextView tvBadge = v.findViewById(R.id.tvChogBadge);
+
+            tvName.setText(slot.name);
+            tvTime.setText(slot.timeRange);
+            tvBadge.setText(slot.statusLabel);
+
+            if (slot.natureType == 1) {
+                tvName.setTextColor(0xFF4ADE80);
+                tvBadge.setBackgroundResource(R.drawable.bg_badge_good);
+                tvBadge.setTextColor(0xFF86EFAC);
+            } else if (slot.natureType == 2) {
+                tvName.setTextColor(0xFFFACC15);
+                tvBadge.setBackgroundResource(R.drawable.bg_badge_neutral);
+                tvBadge.setTextColor(0xFFFEF08A);
+            } else {
+                tvName.setTextColor(0xFFF87171);
+                tvBadge.setBackgroundResource(R.drawable.bg_badge_bad);
+                tvBadge.setTextColor(0xFFFCA5A5);
+            }
+
+            if (slot.isCurrent) {
+                v.setBackgroundResource(R.drawable.bg_chog_cell_current);
+            }
+
+            chogStrip.addView(v);
+
+            if (i < info.slots.size() - 1) {
+                View div = new View(this);
+                div.setBackgroundColor(0x14FFFFFF);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams((int) density, ViewGroup.LayoutParams.MATCH_PARENT);
+                lp.setMargins(0, (int) (4 * density), 0, (int) (4 * density));
+                chogStrip.addView(div, lp);
+            }
+        }
     }
 
     /** Shows the Wi-Fi network name on the button when we can read it, otherwise the connection type. */
@@ -463,8 +608,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         ((TextView) row.findViewById(R.id.title)).setText(title);
         TextView status = row.findViewById(R.id.status);
         View dot = row.findViewById(R.id.dot);
-        // This TV reports "standby" for every port whether or not something is plugged in, so only
-        // definite states are shown.
         if (state == TvInputManager.INPUT_STATE_CONNECTED) {
             status.setText(R.string.connected);
             dot.setVisibility(View.VISIBLE);
